@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "duduexcel"
+version = "0.1.0"
+description = "duduExcel —— 面向 AI Agent 的 Excel MCP 服务：上下文高效 + 安全读写"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "openpyxl>=3.1.0",
+    "mcp>=2.0.0",
+]
+
+[project.optional-dependencies]
+# M2 起的分析能力（服务端聚合，避免把整表灌进 Agent 上下文）
+analysis = ["pandas>=2.0.0"]
+
+[project.scripts]
+duduexcel = "duduexcel.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["duduexcel*"]
+
+[tool.setuptools.package-data]
+duduexcel = ["py.typed"]

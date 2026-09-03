@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# 测试与运行产生的临时 Excel
+tests/_tmp_*.xlsx
+tests/_tmp_*.xlsx.bak
+
+# 备份文件（写操作自动生成）
+*.bak
+
+.DS_Store
