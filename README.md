@@ -108,7 +108,14 @@ opencode（`~/.config/opencode/opencode.jsonc`）：
 
 - **公式重算需要 LibreOffice**：未安装时 `recalculate` 明确降级并给出安装指引（不静默假装成功）。
   此时写入的公式无缓存值，`read_range` 读回 `None` —— 这是预期行为，非数据丢失。
-- **不支持透视表与条件格式**（图表已支持）
+
+  ✅ **已在本机打通验证**（LibreOffice 26.8）：`recalculate` 实测 **4 秒**完成重算，
+  `=SUM(销售!C2:C7)` 正确算出 **575** 并落盘（回归测试见 `tests/test_m8_recalc.py`）。
+
+  ⚠️ **中文路径坑（已修复）**：LibreOffice 在中文路径下**原地覆盖**文件会失败
+  （`SfxBaseModel::impl_store failed: 0x4c0c`）。本实现改为先输出到纯 ASCII 临时目录再移回，
+  因此在 `E:\工作类\研发\` 这类中文路径下也能正常重算。
+- **不支持可交互透视表与条件格式读取**（静态透视表、条件格式写入、图表均已支持）
 - **`.xlsm` 宏**：读取保留 VBA，写入不保证
 - 单次写入上限 **10 万单元格**
 - 小表上 `_meta.tokens_saved` 节省不明显属正常（省 token 的收益随表增大而放大）

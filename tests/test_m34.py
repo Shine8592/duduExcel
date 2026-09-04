@@ -39,12 +39,18 @@ def main() -> int:
     p = build()
     ok = True
 
-    # --- M3：环境缺失时的优雅降级（不静默成功）---
+    # --- M3：降级与真实重算按环境自适应 ---
+    # 本机安装状态可能变化（未装→已装），故两种路径都要能正确处理：
+    # 未装时明确降级并给安装指引；已装时真实重算出结果。
+    has_lo = recalc._find_soffice() is not None
     r = recalc.recalculate(p)
-    soffice_missing = r.get("reason") == "missing_libreoffice"
-    ok &= check("无 LibreOffice 时明确降级", soffice_missing and r["ok"] is False,
-                f"-> reason={r.get('reason')}")
-    if soffice_missing:
+    if has_lo:
+        ok &= check("已装 LibreOffice 时真实重算", r.get("recalculated") is True,
+                    f"-> recalculated={r.get('recalculated')}, 耗时={r.get('elapsed_seconds')}s")
+    else:
+        ok &= check("无 LibreOffice 时明确降级",
+                    r.get("reason") == "missing_libreoffice" and r["ok"] is False,
+                    f"-> reason={r.get('reason')}")
         ok &= check("降级时给出可操作提示", "LibreOffice" in r.get("message", ""))
 
     # 外链熔断函数在无外链时返回空（不误报）

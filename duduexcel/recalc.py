@@ -161,45 +161,69 @@ def recalculate(
     before = (path.stat().st_mtime_ns, path.stat().st_size)
     start = time.time()
 
-    # 用独立 profile 目录避免与用户已运行的 LibreOffice 冲突
-    with tempfile.TemporaryDirectory(prefix="duduexcel_lo_") as profile:
-        env_path = Path(profile)
-        try:
-            cmd = [
-                soffice,
-                f"-env:UserInstallation=file:///{env_path.as_posix()}",
-                "--headless",
-                "--norestore",
-                "--convert-to",
-                "xlsx",
-                "--outdir",
-                str(path.parent),
-                str(path),
-            ]
-            proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=timeout
-            )
-            rc = proc.returncode
-        except subprocess.TimeoutExpired:
-            return {
-                "ok": False,
-                "recalculated": False,
-                "reason": "timeout",
-                "message": f"重算超时（>{timeout}s）。大工作簿请增大 timeout 参数。",
-                "total_errors": None,
-            }
-        except Exception as e:
-            return {
-                "ok": False,
-                "recalculated": False,
-                "reason": "execution_failed",
-                "message": f"调用 LibreOffice 失败：{e}",
-                "total_errors": None,
-            }
+    # 坑：LibreOffice 在**中文/非 ASCII 路径下原地覆盖**输入文件会写入失败，
+    # 报 SfxBaseModel::impl_store failed: 0x4c0c（Error Area:Sfx Class:Write）。
+    # 解决办法：让 soffice 输出到纯 ASCII 的临时目录，成功后再移回原位置。
+    out_dir = Path(tempfile.mkdtemp(prefix="duduexcel_out_"))
+    stderr = ""
+    try:
+        # 独立 profile 目录，避免与用户已运行的 LibreOffice 实例冲突
+        with tempfile.TemporaryDirectory(prefix="duduexcel_lo_") as profile:
+            env_path = Path(profile)
+            try:
+                cmd = [
+                    soffice,
+                    f"-env:UserInstallation=file:///{env_path.as_posix()}",
+                    "--headless",
+                    "--norestore",
+                    "--convert-to",
+                    "xlsx",
+                    "--outdir",
+                    str(out_dir),          # 输出到临时目录（而非原地覆盖）
+                    str(path),
+                ]
+                proc = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=timeout
+                )
+                rc = proc.returncode
+                stderr = (proc.stderr or "").strip()
+            except subprocess.TimeoutExpired:
+                return {
+                    "ok": False,
+                    "recalculated": False,
+                    "reason": "timeout",
+                    "message": f"重算超时（>{timeout}s）。大工作簿请增大 timeout 参数。",
+                    "total_errors": None,
+                }
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "recalculated": False,
+                    "reason": "execution_failed",
+                    "message": f"调用 LibreOffice 失败：{e}",
+                    "total_errors": None,
+                }
+
+        # 转换成功：把临时目录里的结果移回原路径
+        produced = out_dir / path.name
+        if rc == 0 and produced.exists():
+            shutil.move(str(produced), str(path))
+    finally:
+        shutil.rmtree(out_dir, ignore_errors=True)
 
     elapsed = round(time.time() - start, 2)
     after = (path.stat().st_mtime_ns, path.stat().st_size)
     rewritten = before != after
+
+    # LibreOffice 报错但退出码为 0 的情况：把错误信息暴露出来，不静默
+    if rc != 0 and stderr:
+        return {
+            "ok": False,
+            "recalculated": False,
+            "reason": "soffice_error",
+            "message": f"LibreOffice 转换失败（退出码 {rc}）：{stderr[:300]}",
+            "total_errors": None,
+        }
 
     # 文件指纹校验：防"正常退出但没重写文件"的静默失败
     if rc == 0 and not rewritten:
