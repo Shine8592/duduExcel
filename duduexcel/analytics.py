@@ -255,14 +255,25 @@ def _apply_filters(df, filters: list[dict] | None):
             mask &= s == val
         elif op == "!=":
             mask &= s != val
-        elif op == ">":
-            mask &= _to_numeric(s) > float(val)
-        elif op == "<":
-            mask &= _to_numeric(s) < float(val)
-        elif op == ">=":
-            mask &= _to_numeric(s) >= float(val)
-        elif op == "<=":
-            mask &= _to_numeric(s) <= float(val)
+        elif op in (">", "<", ">=", "<="):
+            # 数值比较前必须先确认该列可数值化，否则 _to_numeric 返回 None，
+            # 直接比较会抛 "'>' not supported between NoneType and float"。
+            num = _to_numeric(s)
+            if num is None:
+                raise AnalyticsError(
+                    f"列 '{col}' 不是数值列，无法使用 '{op}' 比较。"
+                    f"文本列请改用：== / != / in / contains / startswith / endswith。"
+                )
+            try:
+                target = float(val)
+            except (TypeError, ValueError):
+                raise AnalyticsError(
+                    f"运算符 '{op}' 需要一个数值型的 value，收到：{val!r}"
+                )
+            mask &= {
+                ">": num > target, "<": num < target,
+                ">=": num >= target, "<=": num <= target,
+            }[op]
         elif op == "in":
             vals = val if isinstance(val, list) else [val]
             mask &= s.isin(vals)
@@ -381,7 +392,7 @@ def aggregate(
         for key, val in series.items():
             k = key if isinstance(key, tuple) else (key,)
             rows.append({**{g: _py(kv) for g, kv in zip(group_by, k)}, op: _r(val)})
-        rows.sort(key=lambda r: (r[op] is None, -(r[op] or 0)))
+        rows.sort(key=_sort_key_factory(op), reverse=True)
         if top_n:
             rows = rows[:top_n]
         result: dict[str, Any] = {
@@ -475,6 +486,26 @@ def top_n(
 # ---------------------------------------------------------------------------
 # 工具函数
 # ---------------------------------------------------------------------------
+def _sort_key_factory(op: str):
+    """生成类型安全的排序键，配合 sort(reverse=True) 使用。
+
+    坑：直接写 `-(r[op] or 0)` 等于假设聚合值一定是数字；
+    当对文本列做 max/min（如"每组最大的姓名"）时值是字符串，
+    一元负号会抛 "bad operand type for unary -: 'str'"。
+    这里按类型分流：数值用 float 比较，非数值按字符串比较，空值排最后。
+    """
+    def key(r):
+        v = r.get(op)
+        if v is None:
+            return (0, 0.0, "")
+        if isinstance(v, bool):
+            return (1, float(v), "")
+        if isinstance(v, (int, float)):
+            return (1, float(v), "")
+        return (1, 0.0, str(v))
+    return key
+
+
 def _to_numeric(s):
     """尽力把列转成数值；全非数值返回 None（避免误把文本列当数值算）。"""
     import pandas as pd

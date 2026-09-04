@@ -28,7 +28,7 @@ except ImportError as e:  # pragma: no cover
         f"缺少 mcp 依赖：{e}\n请执行：pip install 'mcp>=2.0.0' openpyxl"
     )
 
-from duduexcel import analytics, excel_ops, recalc, styling
+from duduexcel import advanced, analytics, excel_ops, recalc, styling
 from duduexcel.safety import (
     SafetyError,
     backup_file,
@@ -355,6 +355,126 @@ def add_chart(
     except Exception:
         revert_last(p)
         raise
+
+
+@mcp.tool()
+def create_pivot(
+    file_path: str,
+    rows: list[str],
+    values: list[str],
+    agg_func: str = "sum",
+    columns: list[str] | None = None,
+    filters: list[dict] | None = None,
+    source_sheet: str | None = None,
+    target_sheet: str = "透视表",
+) -> dict:
+    """生成透视汇总表（写入新工作表）。
+
+    ⚠️ 诚实说明：openpyxl 无法创建真正可交互的 PivotTable 对象，
+    本工具生成的是**静态汇总表**（分组聚合后写回），数值等价但不可交互。
+    需要可交互透视表时，请在 Excel 中基于结果表插入。
+
+    参数：
+    - rows：行分组字段（可多列），如 ["部门"]
+    - values：要聚合的数值列，如 ["销售额"]
+    - agg_func：sum/mean/count/min/max（默认 sum）
+    - columns：列分组字段（可选，做交叉表）
+    - filters：过滤条件（格式同 filter_count）
+    - target_sheet：结果表名（默认"透视表"）
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    backup_file(p)
+    try:
+        return advanced.create_pivot(
+            p, source_sheet, rows, values, agg_func=agg_func,
+            columns=columns, filters=filters, target_sheet=target_sheet,
+        )
+    except Exception:
+        revert_last(p)
+        raise
+
+
+@mcp.tool()
+def add_conditional_format(
+    file_path: str,
+    cell_range: str,
+    cond_type: str,
+    value: float | None = None,
+    value2: float | None = None,
+    sheet: str | None = None,
+) -> dict:
+    """添加条件格式（openpyxl 原生规则，真实生效）。
+
+    cond_type 可选：
+    - data_bar：数据条（无需 value）
+    - color_scale：色阶（无需 value）
+    - greater_than / less_than / equal：需要 value
+    - between：需要 value 与 value2
+    - duplicate：高亮重复值（无需 value）
+
+    参数：
+    - cell_range：作用区域，如 "C2:C100"
+    - value / value2：阈值
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    backup_file(p)
+    try:
+        return advanced.add_conditional_format(
+            p, sheet, cell_range, cond_type, value=value, value2=value2
+        )
+    except Exception:
+        revert_last(p)
+        raise
+
+
+@mcp.tool()
+def compare_sheets(
+    file_path: str,
+    sheet1: str,
+    sheet2: str,
+    key_column: str,
+    compare_columns: list[str] | None = None,
+    max_diff: int = 50,
+) -> dict:
+    """按关键列比对两个工作表的差异 —— 只回传差异摘要，不回传整表。
+
+    用途：版本对比、变更检测、对账。
+
+    返回：仅在表1 / 仅在表2 / 值有差异 三类统计，
+    以及最多 max_diff 条差异明细（超出会明确说明截断数量，以统计值为准）。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return advanced.compare_sheets(
+        p, sheet1, sheet2, key_column, compare_columns, max_diff
+    )
+
+
+@mcp.tool()
+def join_sheets(
+    file_path: str,
+    left_sheet: str,
+    right_sheet: str,
+    on: str,
+    how: str = "left",
+    columns: list[str] | None = None,
+    limit: int = 20,
+) -> dict:
+    """关联两个工作表（类似 SQL JOIN），只回传前 limit 行结果。
+
+    参数：
+    - on：关联键列名（两表都要有）
+    - how：left / right / inner / outer（默认 left）
+    - columns：只返回这些列（省 token），省略返回全部
+    - limit：返回行数上限（默认 20）
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return advanced.join_sheets(
+        p, left_sheet, right_sheet, on, how=how, columns=columns, limit=limit
+    )
 
 
 @mcp.tool()

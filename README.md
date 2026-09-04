@@ -18,7 +18,7 @@ Agent ──MCP(stdio)──► duduExcel ──► openpyxl/pandas ──► .x
 
 **duduExcel：把三者优点合到一个项目** —— 服务端原子分析（省 token）+ 完整读写 + 内置方法论 Skill。
 
-## ✨ 能力（13 个工具）
+## ✨ 能力（17 个工具）
 
 | 层 | 工具 | 说明 |
 |---|---|---|
@@ -34,6 +34,10 @@ Agent ──MCP(stdio)──► duduExcel ──► openpyxl/pandas ──► .x
 | **中文** ⭐ | `apply_chinese_style` | 微软雅黑表头、中文列宽自适应、冻结首行 |
 | | `set_number_format` | `¥#,##0` / `0.0%` / `0.0x` 等内置格式 |
 | **图表** ⭐ | `add_chart` | bar/line/pie/scatter（官方 skill 无图表指导，knorq 明确不支持） |
+| **高级** | `create_pivot` | 透视汇总表（静态，诚实标注不可交互） |
+| | `add_conditional_format` | 数据条/色阶/阈值高亮/重复值（openpyxl 原生规则） |
+| | `compare_sheets` | 两表按关键列比对，只回差异摘要 |
+| | `join_sheets` | 两表关联（left/right/inner/outer），只回前 N 行 |
 | **安全** | `revert_last_write` | 回滚最近一次写入 |
 
 ⭐ = 差异化能力
