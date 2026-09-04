@@ -27,45 +27,108 @@ class SafetyError(Exception):
     """路径越界或安全检查失败时抛出，消息面向 Agent 保持可读、可纠正。"""
 
 
-def get_root() -> Path | None:
-    """返回配置的根目录；未设置返回 None（表示不限制）。"""
+def get_roots() -> list[Path]:
+    """返回允许的根目录列表；未设置返回空列表（表示不限制）。
+
+    支持多个目录，用 `;`（Windows）或 `:`（Linux/macOS）分隔
+    （学 excel-vision-mcp 的 ALLOWED_DIRS 多路径设计）。
+    """
     raw = os.environ.get(ROOT_ENV, "").strip()
     if not raw:
-        return None
-    return Path(raw).resolve()
+        return []
+    sep = ";" if os.name == "nt" else ":"
+    roots = []
+    for part in raw.split(sep):
+        part = part.strip()
+        if part:
+            try:
+                roots.append(Path(part).resolve())
+            except Exception:
+                continue
+    return roots
+
+
+def get_root() -> Path | None:
+    """兼容旧调用：返回第一个根目录。"""
+    roots = get_roots()
+    return roots[0] if roots else None
 
 
 def resolve_path(file_path: str) -> Path:
     """把用户传入的路径解析为安全的绝对路径。
 
     规则：
-    1. 设置了 DUDU_EXCEL_ROOT 时，路径必须是相对路径或位于根目录内；
-       拒绝绝对路径与 `..` 目录穿越。
+    1. 设置了 DUDU_EXCEL_ROOT 时（可多个目录，用 ; 或 : 分隔），
+       相对路径按各根目录依次尝试；绝对路径必须落在某个根目录内。
+       均不匹配则拒绝（防目录穿越）。
     2. 未设置根目录时直接使用传入路径（本地 stdio 默认模式）。
     """
     if not file_path or not str(file_path).strip():
         raise SafetyError("文件路径为空，请提供 .xlsx 文件路径")
 
-    root = get_root()
+    roots = get_roots()
     raw = Path(file_path)
 
-    if root is not None:
-        # 绝对路径：必须在根目录内
+    if roots:
+        candidates: list[Path] = []
         if raw.is_absolute():
-            resolved = raw.resolve()
+            candidates.append(raw.resolve())
         else:
-            resolved = (root / raw).resolve()
-        try:
-            resolved.relative_to(root)
-        except ValueError:
+            candidates.extend((root / raw).resolve() for root in roots)
+
+        legal: list[Path] = []
+        for cand in candidates:
+            for root in roots:
+                try:
+                    cand.relative_to(root)
+                    legal.append(cand)
+                    break
+                except ValueError:
+                    continue
+
+        if not legal:
+            allowed = "、".join(str(r) for r in roots)
             raise SafetyError(
-                f"路径越界：{file_path} 不在允许的根目录 {root} 内。"
-                f"请改用相对路径，或调整环境变量 {ROOT_ENV}。"
+                f"路径越界：{file_path} 不在允许的目录（{allowed}）内。"
+                f"请改用相对路径，或调整环境变量 {ROOT_ENV}（多个目录用 ; 分隔）。"
             )
-        return resolved
+        # 多个根目录都可能合法时，优先返回真实存在的那个
+        for cand in legal:
+            if cand.exists():
+                return cand
+        return legal[0]
 
     # 无根目录限制：仅做基本展开
     return Path(os.path.expanduser(str(file_path))).resolve()
+
+
+def atomic_save(workbook, target: Path) -> None:
+    """原子保存：先写临时文件，成功后再替换目标文件。
+
+    汲取自 excel-vision-mcp 的 "Atomic Saves —— A failed write can never
+    corrupt your original file"。相比"先备份再写"更进一步：
+    写入过程中崩溃也不会留下半截文件，因为目标文件直到最后一步才被替换。
+    """
+    import tempfile
+
+    target = Path(target)
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        suffix=".tmp", prefix=target.stem + "_", dir=str(target.parent)
+    )
+    os.close(tmp_fd)
+    tmp = Path(tmp_name)
+    try:
+        workbook.save(str(tmp))
+        # 临时文件写成功后，再原子替换（Windows 用 replace 支持覆盖）
+        os.replace(str(tmp), str(target))
+    except Exception:
+        # 保存失败：清理临时文件，目标文件保持原样
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except Exception:
+            pass
+        raise
 
 
 def require_exists(path: Path) -> None:

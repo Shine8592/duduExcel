@@ -87,6 +87,23 @@ opencode（`~/.config/opencode/opencode.jsonc`）：
 - **外链熔断**：检测到外链缓存丢失时拒绝重算（否则会永久破坏外链），需显式 `force=true`
 - **本地优先**：stdio 传输，文件不出本机
 
+## 🔄 汲取的新设计（第二轮调研）
+
+调研 `VOYAGER-Inc/excel-vision-mcp` 后发现一个 openpyxl 生态的普遍盲区，
+而 duduExcel 原本也有：**内嵌图片、格式语义、隐藏行列全部丢失**。
+作者用删除线表示"已取消"、黄底表示"待审阅"，而纯文本读取会把它们抹平——
+模型看到的是"字符串表格"，不是"作者想表达的意思"。
+
+已补齐：
+
+| 汲取点 | 来源 | 落地 |
+|---|---|---|
+| **格式语义标记** | excel-vision-mcp | `read_range` 返回 `[B]/[I]/[S]/[HL:色]/[C:色]/[M]`；**只在真用了格式时才附加**，朴素表零额外 token |
+| **隐藏内容智能处理** | excel-vision-mcp | 默认跳过隐藏行列（作者隐藏=不想让你看），但**被可见公式引用的隐藏单元格仍保留**并标 `[HIDDEN-REF]`；始终报告跳过数量，绝不静默丢弃 |
+| **内嵌图片不丢失** | excel-vision-mcp | 新增 `list_images`（零依赖扫描 `xl/media/`），`workbook_info` 也报告图片数 |
+| **原子保存** | excel-vision-mcp | 写临时文件成功后再替换目标，失败的写入永不损坏原文件 |
+| **多目录沙箱** | excel-vision-mcp | `DUDU_EXCEL_ROOT` 支持 `;` 分隔多个目录 |
+
 ## ⚠️ 已知限制（诚实清单）
 
 - **公式重算需要 LibreOffice**：未安装时 `recalculate` 明确降级并给出安装指引（不静默假装成功）。
@@ -99,12 +116,25 @@ opencode（`~/.config/opencode/opencode.jsonc`）：
 ## 🧪 测试
 
 ```bash
-python tests/test_smoke.py   # M1 读写与分页（17 项）
-python tests/test_m2.py      # M2 服务端分析（25 项）
-python tests/test_m34.py     # M3 重算降级 + M4 中文样式与图表（19 项）
+python tests/test_smoke.py       # M1 读写与分页
+python tests/test_m2.py          # M2 服务端分析
+python tests/test_m34.py         # M3 重算降级 + M4 中文样式与图表
+python tests/test_m6.py          # M6 透视表/条件格式/多表关联
+python tests/test_edge_cases.py  # 边界回归（防 BUG 复发）
+python tests/test_m7.py          # M7 格式语义/隐藏处理/图片/原子保存
 ```
 
-全部 **61 项通过**，另有 14 项 MCP stdio 协议端到端验证。
+6 个测试文件 **全部通过**，另有 **20 项 MCP stdio 端到端验证**（覆盖全部 19 个工具）。
+
+## 🧠 踩过的坑（值得记住）
+
+1. **openpyxl `read_only=True` 模式不加载行列维度** —— `ws.row_dimensions` 为空，
+   隐藏检测会**静默失效**。改为直接解析 sheet XML（零内存且准确）。
+2. **mcp 2.x 的 schema 生成器会丢弃 `str | None`（PEP 604）标注的参数** ——
+   表现为"工具传了参数却不生效"。统一改用 `Optional[str]` 才正常。
+3. **图表 `Reference(range_string="B2:B5")` 要求 `表名!A1:B2` 形式** ——
+   中文表名还需引号包裹。改用 `range_boundaries()` 解析成行列参数。
+4. **重复 `@mcp.tool()` 注册同名函数**会触发 `Tool already exists` 警告且行为异常。
 
 ## 📚 Skill 层
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any, Optional
 
 # 启动早期把脚本目录加入 sys.path，兼容以 stdio 被宿主拉起、
 # 不继承 PYTHONPATH 的场景（沿用记忆系统 mcp_server.py 的同款处理）
@@ -57,38 +58,10 @@ def workbook_info(file_path: str) -> dict:
 
 
 @mcp.tool()
-def read_range(
-    file_path: str,
-    sheet: str | None = None,
-    cell_range: str | None = None,
-    offset: int = 0,
-    limit: int = 200,
-) -> dict:
-    """读取工作表数据，支持分页与截断保护。
-
-    重要：不要试图一次读完大表。默认 limit=200 行，
-    超出的部分通过增大 offset 分批获取（返回结果中的 truncated 会告诉你是否还有剩余）。
-
-    参数：
-    - sheet：工作表名，省略则用活动表
-    - cell_range：Excel 区域，如 "A1:D50"；省略则读整表（仍受 limit 约束）
-    - offset / limit：分页，从第 offset 行开始取 limit 行
-
-    返回：grid（二维值）、cells（坐标→值）、formulas（含公式单元格的公式原文）、
-    truncated（是否被截断）。
-    """
-    p = resolve_path(file_path)
-    require_exists(p)
-    return excel_ops.read_range(
-        p, sheet=sheet, cell_range=cell_range, offset=offset, limit=limit
-    )
-
-
-@mcp.tool()
 def write_cells(
     file_path: str,
     cells: list[dict],
-    sheet: str | None = None,
+    sheet: Optional[str] = None,
     create_sheet_if_missing: bool = False,
 ) -> dict:
     """批量写入多个单元格 —— 一次调用完成，不要用单格写入循环调用。
@@ -122,7 +95,89 @@ def write_cells(
 
 
 @mcp.tool()
-def sheet_profile(file_path: str, sheet: str | None = None) -> dict:
+def _as_bool(v, default: bool) -> bool:
+    """把参数稳健地转成布尔值。
+
+    坑：MCP SDK（mcp 2.x）对带默认值的 bool 参数，在 schema→函数调用绑定时
+    可能不传递该键，导致工具内始终拿到默认值（表现为"传了 True 却按 False 跑"）。
+    因此这里同时接受 bool、字符串（"true"/"1"/"yes"）与 None。
+    """
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("true", "1", "yes", "y", "on"):
+            return True
+        if s in ("false", "0", "no", "n", "off"):
+            return False
+    return default
+
+
+@mcp.tool()
+def read_range(
+    file_path: str,
+    sheet: Optional[str] = None,
+    cell_range: Optional[str] = None,
+    offset: int = 0,
+    limit: int = 200,
+    include_format: bool = True,
+    include_hidden: bool = False,
+) -> dict:
+    """读取工作表数据，支持分页、截断、格式语义与隐藏内容处理。
+
+    重要：不要试图一次读完大表。默认 limit=200 行，
+    超出的部分通过增大 offset 分批获取（truncated 会告诉你是否还有剩余）。
+
+    参数：
+    - sheet：工作表名，省略则用活动表
+    - cell_range：Excel 区域，如 "A1:D50"；省略则读整表（仍受 limit 约束）
+    - offset / limit：分页，从第 offset 行开始取 limit 行
+    - include_format：是否附加格式语义标记（默认 True）
+    - include_hidden：是否读取隐藏行列（默认 False）
+
+    格式语义标记（汲取自 excel-vision-mcp —— 作者留下的格式是有含义的）：
+    - [B] 粗体 / [I] 斜体 / [S] **删除线（常表示"已取消/作废"）**
+    - [HL:色] 底色高亮（常表示"待审阅/重点"） / [C:色] 字体色
+    - [M] 合并单元格 / [HIDDEN-REF] 已隐藏但因被公式引用而保留
+    注意：只在单元格真的用了格式时才附加，朴素表格不产生任何额外 token。
+
+    隐藏内容：默认跳过（作者隐藏通常表示不属于审阅内容），
+    但**被可见公式引用的隐藏单元格仍保留**并标记 [HIDDEN-REF]，
+    且始终报告跳过了多少，绝不静默丢弃。
+
+    返回：grid（二维值）、cells（坐标→值）、formulas、format_markers。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return excel_ops.read_range(
+        p, sheet=sheet, cell_range=cell_range, offset=offset, limit=limit,
+        include_format=_as_bool(include_format, True),
+        include_hidden=_as_bool(include_hidden, False),
+    )
+
+
+@mcp.tool()
+def list_images(file_path: str) -> dict:
+    """列出工作簿内的嵌图片（零依赖，直接扫描 xl/media/）。
+
+    为什么需要它：多数 Excel MCP 会**静默丢弃所有内嵌图片**，
+    于是贴在单元格里的流程图/截图永远到不了模型眼前。
+
+    返回：图片数量、文件名、大小、尺寸（PNG/JPEG/GIF/BMP 可从文件头解析）。
+    注意：只返回**清单**而非图片本体，避免 base64 撑爆上下文；
+    若需模型"看到"图片内容，请解压后交给多模态模型读取。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return excel_ops.list_images(p)
+
+
+@mcp.tool()
+def sheet_profile(file_path: str, sheet: Optional[str] = None) -> dict:
     """查看工作表的列级画像：类型、空值率、唯一数、Top 值、数值统计。
 
     **这是开始分析任何表格前最该先调用的工具** —— 一次调用即可摸清全表
@@ -143,8 +198,8 @@ def sheet_profile(file_path: str, sheet: str | None = None) -> dict:
 @mcp.tool()
 def filter_count(
     file_path: str,
-    filters: list[dict] | None = None,
-    sheet: str | None = None,
+    filters: Optional[list[dict]] = None,
+    sheet: Optional[str] = None,
     sample: int = 3,
 ) -> dict:
     """按条件统计行数 —— 只返回计数，不返回数据行。
@@ -170,10 +225,10 @@ def aggregate(
     file_path: str,
     column: str,
     op: str = "sum",
-    group_by: list[str] | None = None,
-    filters: list[dict] | None = None,
-    sheet: str | None = None,
-    top_n: int | None = None,
+    group_by: Optional[list[str]] = None,
+    filters: Optional[list[dict]] = None,
+    sheet: Optional[str] = None,
+    top_n: Optional[int] = None,
 ) -> dict:
     """服务端聚合：sum / mean / median / min / max / count / std / var / nunique。
 
@@ -202,9 +257,9 @@ def top_n(
     sort_by: str,
     n: int = 10,
     ascending: bool = False,
-    columns: list[str] | None = None,
-    filters: list[dict] | None = None,
-    sheet: str | None = None,
+    columns: Optional[list[str]] = None,
+    filters: Optional[list[dict]] = None,
+    sheet: Optional[str] = None,
 ) -> dict:
     """取排序后的前 N 行（默认降序），只回传这 N 行。
 
@@ -268,11 +323,11 @@ def scan_formula_errors(file_path: str) -> dict:
 @mcp.tool()
 def apply_chinese_style(
     file_path: str,
-    sheet: str | None = None,
+    sheet: Optional[str] = None,
     header_row: int = 1,
     freeze_header: bool = True,
     auto_width: bool = True,
-    font_name: str | None = None,
+    font_name: Optional[str] = None,
 ) -> dict:
     """套用中文场景样式：中文字体表头、自动列宽（中文按 2 字符宽）、冻结首行、细边框。
 
@@ -303,7 +358,7 @@ def set_number_format(
     file_path: str,
     cell_range: str,
     number_format: str,
-    sheet: str | None = None,
+    sheet: Optional[str] = None,
 ) -> dict:
     """设置数字格式。
 
@@ -329,9 +384,9 @@ def set_number_format(
 def add_chart(
     file_path: str,
     data_range: str,
-    sheet: str | None = None,
+    sheet: Optional[str] = None,
     chart_type: str = "bar",
-    categories_range: str | None = None,
+    categories_range: Optional[str] = None,
     title: str = "",
     anchor_cell: str = "E2",
 ) -> dict:
@@ -363,9 +418,9 @@ def create_pivot(
     rows: list[str],
     values: list[str],
     agg_func: str = "sum",
-    columns: list[str] | None = None,
-    filters: list[dict] | None = None,
-    source_sheet: str | None = None,
+    columns: Optional[list[str]] = None,
+    filters: Optional[list[dict]] = None,
+    source_sheet: Optional[str] = None,
     target_sheet: str = "透视表",
 ) -> dict:
     """生成透视汇总表（写入新工作表）。
@@ -400,9 +455,9 @@ def add_conditional_format(
     file_path: str,
     cell_range: str,
     cond_type: str,
-    value: float | None = None,
-    value2: float | None = None,
-    sheet: str | None = None,
+    value: Optional[float] = None,
+    value2: Optional[float] = None,
+    sheet: Optional[str] = None,
 ) -> dict:
     """添加条件格式（openpyxl 原生规则，真实生效）。
 
@@ -435,7 +490,7 @@ def compare_sheets(
     sheet1: str,
     sheet2: str,
     key_column: str,
-    compare_columns: list[str] | None = None,
+    compare_columns: Optional[list[str]] = None,
     max_diff: int = 50,
 ) -> dict:
     """按关键列比对两个工作表的差异 —— 只回传差异摘要，不回传整表。
@@ -459,7 +514,7 @@ def join_sheets(
     right_sheet: str,
     on: str,
     how: str = "left",
-    columns: list[str] | None = None,
+    columns: Optional[list[str]] = None,
     limit: int = 20,
 ) -> dict:
     """关联两个工作表（类似 SQL JOIN），只回传前 limit 行结果。
