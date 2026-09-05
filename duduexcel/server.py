@@ -3,10 +3,9 @@
 """
 duduExcel MCP 服务入口。
 
-M1 阶段提供三个工具，设计上全部贯彻"上下文高效 + 安全"两条主线：
-- workbook_info  ：一次调用摸清文件结构（省去多次试探）
-- read_range     ：分页 + 截断 + 诚实报告（绝不把大表灌进上下文）
-- write_cells    ：批量写入 + 写前自动备份（不可逆操作带安全网）
+设计上贯彻两条主线：
+- 上下文高效：分页/截断/服务端聚合，绝不把整表灌进 Agent 上下文
+- 安全：路径沙箱 + 写前备份 + 原子保存 + 失败回滚
 
 工具描述（docstring）是 Agent 唯一能看到的说明书，因此每条都写明：
 用途 / 何时用 / 批量优先提醒 / 限制与截断行为。
@@ -38,19 +37,43 @@ from duduexcel.safety import (
     revert_last,
 )
 
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.2.0"
 
 mcp = MCPServer("duduExcel")
 
 
+# 注意：这是内部辅助函数，**不要**加 @mcp.tool() 装饰器
+# （此前误加导致它被注册成一个名为 _as_bool 的工具，污染了 tools/list）
+def _as_bool(v, default: bool) -> bool:
+    """把参数稳健地转成布尔值。
+
+    坑：MCP SDK（mcp 2.x）对带默认值的 bool 参数，在 schema→函数调用绑定时
+    可能不传递该键，导致工具内始终拿到默认值（表现为"传了 True 却按 False 跑"）。
+    因此这里同时接受 bool、字符串（"true"/"1"/"yes"）与 None。
+    """
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ("true", "1", "yes", "y", "on"):
+            return True
+        if s in ("false", "0", "no", "n", "off"):
+            return False
+    return default
+
+
 @mcp.tool()
 def workbook_info(file_path: str) -> dict:
-    """查看 Excel 工作簿结构：工作表清单、每张表的行列数、文件大小。
+    """查看 Excel 工作簿结构：工作表清单、每张表的行列数、合并单元格数、隐藏行列数、内嵌图片数与文件大小。
 
     用途：开始处理任何 Excel 文件前**先调用这个**，用一次调用摸清结构，
     避免为了知道有哪些表就把整张表读进上下文。
 
-    返回：文件路径、大小、活动表名、每个工作表的 name/rows/columns。
+    返回：文件路径、大小、活动表名、每个工作表的 name/rows/columns/merged_cells/hidden_rows/hidden_columns。
     """
     p = resolve_path(file_path)
     require_exists(p)
@@ -75,7 +98,7 @@ def write_cells(
     - sheet：工作表名，省略则写活动表
     - create_sheet_if_missing：工作表不存在时是否新建（默认 False，避免误建表）
 
-    安全：写入前自动生成 .bak 备份，可用 revert_last 回滚最近一次写入。
+    安全：写入前自动生成 .bak 备份 + 原子保存，可用 revert_last_write 回滚。
     限制：单次最多 10 万个单元格。
     """
     p = resolve_path(file_path)
@@ -92,29 +115,6 @@ def write_cells(
         # 写入失败：自动回滚，不让文件停留在半成品状态
         revert_last(p)
         raise
-
-
-@mcp.tool()
-def _as_bool(v, default: bool) -> bool:
-    """把参数稳健地转成布尔值。
-
-    坑：MCP SDK（mcp 2.x）对带默认值的 bool 参数，在 schema→函数调用绑定时
-    可能不传递该键，导致工具内始终拿到默认值（表现为"传了 True 却按 False 跑"）。
-    因此这里同时接受 bool、字符串（"true"/"1"/"yes"）与 None。
-    """
-    if v is None:
-        return default
-    if isinstance(v, bool):
-        return v
-    if isinstance(v, (int, float)):
-        return bool(v)
-    if isinstance(v, str):
-        s = v.strip().lower()
-        if s in ("true", "1", "yes", "y", "on"):
-            return True
-        if s in ("false", "0", "no", "n", "off"):
-            return False
-    return default
 
 
 @mcp.tool()
