@@ -485,6 +485,21 @@ def add_conditional_format(
 
 
 @mcp.tool()
+def list_conditional_formats(file_path: str, sheet: str | None = None) -> dict:
+    """读取工作表中已有的条件格式规则（写入 + 读取闭环）。
+
+    用途：接手一张别人的表时，先看清它埋了哪些自动规则（哪些格子会变色/变红），
+    避免修改时破坏既有规则。
+
+    返回：规则条数与明细（作用区域 / 类型 / 运算符 / 阈值公式 / 填充色 / 优先级），
+    按优先级排序。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return advanced.list_conditional_formats(p, sheet)
+
+
+@mcp.tool()
 def compare_sheets(
     file_path: str,
     sheet1: str,

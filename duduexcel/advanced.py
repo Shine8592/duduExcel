@@ -241,6 +241,76 @@ def add_conditional_format(
 
 
 # ---------------------------------------------------------------------------
+# 条件格式读取
+# ---------------------------------------------------------------------------
+def list_conditional_formats(file_path: Path, sheet: str | None = None) -> dict:
+    """读取工作表中已有的条件格式规则。
+
+    说明：调研时竞品 knorq 的 Known Limitations 写着"不支持条件格式"，
+    官方文档也常称 openpyxl 读取条件格式受限；但**实测是可以完整读回的**
+    （范围 / 类型 / 运算符 / 阈值 / 填充色 / 优先级都能拿到），因此这里补上读取能力，
+    形成"写入 + 读取"的闭环。
+
+    用途：
+    - 接手一张别人的表时，先看清它埋了哪些规则（哪些格子会自动变红/变色）
+    - 修改前确认不破坏既有规则
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(filename=str(file_path))
+    try:
+        ws = wb[sheet] if sheet and sheet in wb.sheetnames else wb.active
+        sheet_name = ws.title
+
+        rules: list[dict[str, Any]] = []
+        try:
+            for rng in ws.conditional_formatting:
+                for rule in rng.rules:
+                    item: dict[str, Any] = {
+                        "range": str(rng.sqref),
+                        "type": rule.type,
+                        "operator": getattr(rule, "operator", None),
+                        "formula": list(getattr(rule, "formula", None) or []),
+                        "priority": getattr(rule, "priority", None),
+                    }
+                    # 填充色（高亮类规则才有 dxf）
+                    dxf = getattr(rule, "dxf", None)
+                    if dxf is not None:
+                        fill = getattr(dxf, "fill", None)
+                        if fill is not None:
+                            color = getattr(getattr(fill, "bgColor", None), "rgb", None)
+                            if color:
+                                item["fill_color"] = color
+
+                    # 关键：构造完必须加入结果列表（此前漏掉这行导致永远返回 0 条）
+                    rules.append(item)
+
+            # 按优先级排序，便于阅读
+            rules.sort(key=lambda r: (r.get("priority") is None, r.get("priority") or 0))
+        except Exception as e:
+            return {
+                "file": str(file_path),
+                "sheet": sheet_name,
+                "count": 0,
+                "rules": [],
+                "note": f"读取条件格式失败：{e}",
+            }
+
+        return {
+            "file": str(file_path),
+            "sheet": sheet_name,
+            "count": len(rules),
+            "rules": rules,
+            "note": (
+                f"该工作表共有 {len(rules)} 条条件格式规则。修改这些区域前请先确认不会破坏既有规则。"
+                if rules else "该工作表没有条件格式规则"
+            ),
+        }
+    finally:
+        wb.close()
+
+
+# ---------------------------------------------------------------------------
 # 多表关联：比较 / 连接
 # ---------------------------------------------------------------------------
 def compare_sheets(

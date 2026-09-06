@@ -115,7 +115,11 @@ opencode（`~/.config/opencode/opencode.jsonc`）：
   ⚠️ **中文路径坑（已修复）**：LibreOffice 在中文路径下**原地覆盖**文件会失败
   （`SfxBaseModel::impl_store failed: 0x4c0c`）。本实现改为先输出到纯 ASCII 临时目录再移回，
   因此在 `E:\工作类\研发\` 这类中文路径下也能正常重算。
-- **不支持可交互透视表与条件格式读取**（静态透视表、条件格式写入、图表均已支持）
+- **不支持可交互透视表**：`create_pivot` 生成的是静态汇总表（数值正确且已验证，如华东 365 / 华南 210），
+  但 openpyxl 无法创建真正的 PivotTable 对象（实测 `ws._pivots` 为空），因此不可点击交互。
+- ~~条件格式只能写入不能读取~~ —— **已更正**：实测条件格式**可以完整读回**。
+  `list_conditional_formats` 能返回作用区域/类型/运算符/阈值/填充色/优先级（实测 4 条规则全部读回）。
+  此前我照抄了竞品 knorq 的 Known Limitations 而未亲自验证，这是错误的。
 - **`.xlsm` 宏**：读取保留 VBA，写入不保证
 - 单次写入上限 **10 万单元格**
 - 小表上 `_meta.tokens_saved` 节省不明显属正常（省 token 的收益随表增大而放大）

@@ -117,8 +117,8 @@ Restart your client after editing the config.
 
 ## ⚠️ Known Limitations (honest list)
 
-- **Interactive PivotTables are not supported.** `create_pivot` produces a **static summary table** (group-and-aggregate written back) — numerically equivalent but not clickable. openpyxl cannot create real PivotTable objects.
-- **Conditional formatting can be written, not read** (openpyxl limitation).
+- **Interactive PivotTables are not supported.** `create_pivot` produces a **static summary table** (group-and-aggregate written back) — numerically equivalent and verified correct (e.g. East 365 / South 210), but not clickable. openpyxl cannot create real PivotTable objects (`ws._pivots` is empty).
+- ~~Conditional formatting can be written, not read~~ — **corrected**: it *can* be read. `list_conditional_formats` returns range, type, operator, thresholds, fill color, and priority (verified: 4/4 rules read back). This limitation was mistakenly copied from a competitor's README without verification.
 - **`.xlsm` macros** are preserved on read; not guaranteed on write.
 - Max **100,000 cells** per write.
 - `recalculate` needs LibreOffice (verified working on 26.8, ~4s for a typical sheet).
@@ -163,8 +163,8 @@ references/charts.md      # chart recipes and fidelity caveats
 - [x] M5 Skill layer
 - [x] M6 pivot / conditional format / multi-sheet joins
 - [x] M7 format semantics / hidden content / embedded images / atomic save
-- [ ] Interactive PivotTables
-- [ ] Conditional-formatting *reading*
+- [x] Conditional-formatting reading (`list_conditional_formats`)
+- [ ] Interactive PivotTables (blocked by openpyxl)
 
 ---
 
