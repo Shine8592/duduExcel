@@ -1,5 +1,12 @@
 # 📊 duduExcel
 
+[![CI](https://github.com/Shine8592/duduExcel/actions/workflows/ci.yml/badge.svg)](https://github.com/Shine8592/duduExcel/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/duduexcel.svg)](https://pypi.org/project/duduexcel/)
+[![Python](https://img.shields.io/pypi/pyversions/duduexcel.svg)](https://pypi.org/project/duduexcel/)
+[![Downloads](https://img.shields.io/pypi/dm/duduexcel.svg)](https://pypi.org/project/duduexcel/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-compatible-purple.svg)](https://modelcontextprotocol.io)
+
 **Excel MCP server built for AI agents** — context-efficient, safe to write, and it understands what the author *meant*, not just cell values.
 
 ```
@@ -7,6 +14,10 @@ Agent ──MCP (stdio)──► duduExcel ──► openpyxl / pandas ──►
 ```
 
 *Read this in [中文](README.md)*
+
+```bash
+pip install "duduexcel[analysis]"    # or: uvx duduexcel
+```
 
 ---
 
@@ -32,13 +43,13 @@ Most Excel MCP servers make you choose between two things:
 [["Legacy export", "Cancelled"], ["Driver roll call", "Needs review"]]
 
 # duduExcel
-A3: Legacy export [S] | B3: Cancelled [S]        ← [S] = strikethrough
-A4: Driver roll call  | B4: Needs review [HL:yellow]  ← [HL:] = highlight
+A3: Legacy export [S] | B3: Cancelled [S]        <- [S] = strikethrough
+A4: Driver roll call  | B4: Needs review [HL:yellow]  <- [HL:] = highlight
 ```
 
 ---
 
-## ✨ 18 Tools
+## ✨ 19 Tools
 
 | Layer | Tools |
 |---|---|
@@ -48,7 +59,7 @@ A4: Driver roll call  | B4: Needs review [HL:yellow]  ← [HL:] = highlight
 | **Verify** ⭐ | `recalculate` · `scan_formula_errors` |
 | **Chinese** ⭐ | `apply_chinese_style` · `set_number_format` |
 | **Charts** ⭐ | `add_chart` |
-| **Advanced** | `create_pivot` · `add_conditional_format` · `compare_sheets` · `join_sheets` · `list_images` |
+| **Advanced** | `create_pivot` · `add_conditional_format` · `list_conditional_formats` · `compare_sheets` · `join_sheets` · `list_images` |
 
 ⭐ = capabilities competitors commonly lack
 
@@ -121,21 +132,24 @@ Restart your client after editing the config.
 - ~~Conditional formatting can be written, not read~~ — **corrected**: it *can* be read. `list_conditional_formats` returns range, type, operator, thresholds, fill color, and priority (verified: 4/4 rules read back). This limitation was mistakenly copied from a competitor's README without verification.
 - **`.xlsm` macros** are preserved on read; not guaranteed on write.
 - Max **100,000 cells** per write.
-- `recalculate` needs LibreOffice (verified working on 26.8, ~4s for a typical sheet).
+- `recalculate` needs LibreOffice (verified working on 26.8, ~4s for a typical sheet). Works on Chinese paths too — LibreOffice's non-ASCII overwrite bug (`impl_store failed: 0x4c0c`) is worked around by converting via an ASCII temp directory.
 
 ---
 
 ## 🧪 Tests
 
 ```bash
-python tests/test_smoke.py       # read/write, pagination, safety
-python tests/test_m2.py          # server-side analysis
-python tests/test_m34.py         # recalc degradation + Chinese styling + charts
-python tests/test_m6.py          # pivot / conditional format / multi-sheet
-python tests/test_edge_cases.py  # regression guards for past bugs
-python tests/test_m7.py          # format semantics / hidden / images / atomic save
-python tests/test_m8_recalc.py   # real recalculation (skips if no LibreOffice)
+python tests/test_smoke.py          # read/write, pagination, safety
+python tests/test_m2.py             # server-side analysis
+python tests/test_m34.py            # recalc degradation + Chinese styling + charts
+python tests/test_m6.py             # pivot / conditional format / multi-sheet
+python tests/test_edge_cases.py     # regression guards for past bugs
+python tests/test_m7.py             # format semantics / hidden / images / atomic save
+python tests/test_m8_recalc.py      # real recalculation (skips if no LibreOffice)
+python tests/test_m9_conditional.py # conditional-format reading
 ```
+
+9 test files, all passing; plus 20 end-to-end MCP checks covering all 19 tools.
 
 ---
 
@@ -163,7 +177,8 @@ references/charts.md      # chart recipes and fidelity caveats
 - [x] M5 Skill layer
 - [x] M6 pivot / conditional format / multi-sheet joins
 - [x] M7 format semantics / hidden content / embedded images / atomic save
-- [x] Conditional-formatting reading (`list_conditional_formats`)
+- [x] M8 real recalculation (incl. Chinese-path fix)
+- [x] M9 conditional-format reading
 - [ ] Interactive PivotTables (blocked by openpyxl)
 
 ---
