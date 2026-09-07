@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "duduexcel"
-version = "0.2.2"
-description = "Excel MCP server for AI agents: context-efficient (server-side aggregation), safe writes (atomic save + backup + rollback), format semantics (strikethrough/highlight), formula recalculation, and first-class Chinese support."
+version = "0.3.0"
+description = "Excel MCP server for AI agents: context-efficient (server-side aggregation), safe writes (atomic save + backup + rollback), format semantics (strikethrough/highlight), interactive PivotTables, formula recalculation, and first-class Chinese support."
 readme = { file = "README_EN.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
@@ -13,6 +13,7 @@ authors = [{ name = "Shine8592" }]
 keywords = [
     "excel", "xlsx", "spreadsheet", "mcp", "model-context-protocol",
     "ai-agent", "llm", "openpyxl", "pandas", "automation", "chinese",
+    "pivottable", "pivot-table",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
