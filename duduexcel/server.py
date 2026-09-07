@@ -28,7 +28,7 @@ except ImportError as e:  # pragma: no cover
         f"缺少 mcp 依赖：{e}\n请执行：pip install 'mcp>=2.0.0' openpyxl"
     )
 
-from duduexcel import advanced, analytics, excel_ops, recalc, styling
+from duduexcel import advanced, analytics, excel_ops, pivot_ooxml, recalc, styling
 from duduexcel.safety import (
     SafetyError,
     backup_file,
@@ -482,6 +482,57 @@ def add_conditional_format(
     except Exception:
         revert_last(p)
         raise
+
+
+@mcp.tool()
+def create_interactive_pivot(
+    file_path: str,
+    rows: list[str],
+    values: list[str],
+    agg_func: str = "sum",
+    columns: Optional[list[str]] = None,
+    page_fields: Optional[list[str]] = None,
+    filters: Optional[list[dict]] = None,
+    source_sheet: Optional[str] = None,
+    target_sheet: str = "PivotTable",
+    location: str = "A3",
+) -> dict:
+    """Create an INTERACTIVE PivotTable (a real Excel PivotTable object).
+
+    Difference from `create_pivot` (static summary):
+    - `create_pivot`           : writes aggregated numbers into cells - fast but static
+    - `create_interactive_pivot`: injects real OOXML pivot parts, so in Excel you can
+      drag fields, expand/collapse and refresh (structure validated with LibreOffice)
+
+    Args:
+    - rows / columns / values: row / column (cross-tab) / value fields
+    - agg_func: sum / count / average / min / max (default sum)
+    - page_fields: report filter fields
+    - filters: row filters (same format as filter_count)
+    - target_sheet: target worksheet (created if missing)
+    - location: top-left anchor (default A3)
+
+    LIMITATIONS:
+    1. Saving this file again with openpyxl (incl. this server's write_cells) will DROP
+       the PivotTable - openpyxl cannot write pivot parts back. Generate it LAST.
+    2. Not supported: field grouping, calculated fields/items, slicers, timelines,
+       multiple sources, data model.
+    3. LibreOffice recognizes it but interacts more weakly than Excel.
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return pivot_ooxml.create_interactive_pivot(
+        p,
+        source_sheet=source_sheet,
+        rows=rows,
+        values=values,
+        agg_func=agg_func,
+        columns=columns,
+        page_fields=page_fields,
+        filters=filters,
+        target_sheet=target_sheet,
+        location=location,
+    )
 
 
 @mcp.tool()
