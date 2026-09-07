@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/duduexcel.svg)](https://pypi.org/project/duduexcel/)
 [![Python](https://img.shields.io/pypi/pyversions/duduexcel.svg)](https://pypi.org/project/duduexcel/)
 [![Downloads](https://img.shields.io/pypi/dm/duduexcel.svg)](https://pypi.org/project/duduexcel/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Shine8592/duduExcel/blob/main/LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-purple.svg)](https://modelcontextprotocol.io)
 
 **Excel MCP server built for AI agents** — context-efficient, safe to write, and it understands what the author *meant*, not just cell values.
@@ -13,7 +13,10 @@
 Agent ──MCP (stdio)──► duduExcel ──► openpyxl / pandas ──► .xlsx
 ```
 
-*Read this in [中文](README.md)*
+*Read this in [中文](https://github.com/Shine8592/duduExcel/blob/main/README.md)*
+
+> 说明：PyPI 只渲染一个 README，且相对链接会被解析成站内路径（导致 404），
+> 因此此处的链接全部使用 GitHub 绝对地址。
 
 ```bash
 pip install "duduexcel[analysis]"    # or: uvx duduexcel

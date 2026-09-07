@@ -4,12 +4,12 @@
 [![PyPI](https://img.shields.io/pypi/v/duduexcel.svg)](https://pypi.org/project/duduexcel/)
 [![Python](https://img.shields.io/pypi/pyversions/duduexcel.svg)](https://pypi.org/project/duduexcel/)
 [![Downloads](https://img.shields.io/pypi/dm/duduexcel.svg)](https://pypi.org/project/duduexcel/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Shine8592/duduExcel/blob/main/LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-purple.svg)](https://modelcontextprotocol.io)
 
 面向 AI Agent 的 Excel MCP 服务 —— **上下文高效 + 安全读写 + 中文场景 + 公式验证**。
 
-**[English](README_EN.md) | 中文**
+**[English](https://github.com/Shine8592/duduExcel/blob/main/README_EN.md) | 中文**
 
 > 其他 Excel MCP 会把"已取消"的行和"生效中"的行读成一模一样的字符串，
 > duduExcel 保留删除线 —— 因为**作者留下的格式，本身就是语义**。
