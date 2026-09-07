@@ -160,9 +160,11 @@ def main() -> int:
         p4.unlink()
 
     # --- 6. 多目录沙箱 ---
+    # 分隔符用 os.pathsep，不能硬编码 ';'：
+    # Windows 用 ';'、Linux 用 ':'；硬编码会让非 Windows 上把整串当成单个非法路径。
     d1 = Path(__file__).parent
     d2 = Path(__file__).parent.parent
-    os.environ["DUDU_EXCEL_ROOT"] = f"{d1};{d2}"
+    os.environ["DUDU_EXCEL_ROOT"] = f"{d1}{os.pathsep}{d2}"
     try:
         ok &= check("多目录沙箱：第一个目录内的文件可访问",
                     resolve_path("test_m7.py").exists())
