@@ -32,13 +32,24 @@ def get_roots() -> list[Path]:
 
     支持多个目录，用 `;`（Windows）或 `:`（Linux/macOS）分隔
     （学 excel-vision-mcp 的 ALLOWED_DIRS 多路径设计）。
+
+    跨平台兼容：POSIX 下**同时接受** `:` 与 `;`。
+    原因：Windows 配置常写成 `a;b`，若直接复制到 Linux 运行，
+    只按 `:` 切分会得到单个非法路径 "a;b"，从而静默解析出错
+    （CI 上就因此导致 Ubuntu 全挂、Windows 全过）。
+    注意 Windows 路径自带盘符冒号（C:\\...），故 Windows 只能按 `;` 切。
     """
     raw = os.environ.get(ROOT_ENV, "").strip()
     if not raw:
         return []
-    sep = ";" if os.name == "nt" else ":"
+    import re
+
+    if os.name == "nt":
+        parts = re.split(r"[;]", raw)
+    else:
+        parts = re.split(r"[:;]", raw)
     roots = []
-    for part in raw.split(sep):
+    for part in parts:
         part = part.strip()
         if part:
             try:
