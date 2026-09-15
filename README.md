@@ -76,6 +76,27 @@ Agent ──MCP(stdio)──► duduExcel ──► openpyxl/pandas ──► .x
 | 外链熔断、诚实截断、交付前验证 | 官方 `recalc.py` | `recalculate` |
 | 格式语义、隐藏处理、内嵌图片、原子保存 | excel-vision-mcp | `read_range` 标记 / `list_images` / 原子保存 |
 
+## ⚡ 30 秒快速体验
+
+```bash
+pip install "duduexcel[analysis]"
+```
+
+仓库自带演示文件 `examples/demo.xlsx`（内含删除线、黄底高亮、隐藏行、公式埋点）。
+接上 MCP 客户端后试试：
+
+```
+读一下 examples/demo.xlsx 的需求清单，哪些条目已经取消了？
+```
+→ 返回带格式语义的视图，**看得见"已取消"和"已批准"的区别**：
+
+```
+A3: 旧版导出 [S] | C3: 已取消 [S]          ← [S] = 删除线
+A4: 司机点名      | C4: 待审阅 [HL:FFFF00]  ← 黄底 = 待审阅
+```
+
+更多示例见 [`examples/README.md`](examples/README.md)。
+
 ## 🚀 安装与挂载
 
 ```bash
