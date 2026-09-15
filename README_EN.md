@@ -78,6 +78,27 @@ A4: Driver roll call  | B4: Needs review [HL:yellow]  <- [HL:] = highlight
 
 ---
 
+## ⚡ 30-second demo
+
+```bash
+pip install "duduexcel[analysis]"
+```
+
+The repo ships `examples/demo.xlsx` (with strikethrough, highlight, a hidden row and a formula).
+Ask your agent:
+
+```
+Read examples/demo.xlsx and tell me which items are cancelled
+```
+→ Returns a format-aware view, so **"cancelled" no longer looks like "approved"**:
+
+```
+A3: Legacy export [S] | C3: Cancelled [S]              <- [S] = strikethrough
+A4: Driver roll call  | C4: Needs review [HL:FFFF00]   <- highlight
+```
+
+See [`examples/README.md`](https://github.com/Shine8592/duduExcel/blob/main/examples/README.md) for more.
+
 ## 🚀 Install
 
 ```bash
