@@ -9,10 +9,11 @@
 
 | # | 渠道 | 状态 | 说明 |
 |---|---|---|---|
-| 1 | **glama.ai** | ✅ **已收录** | https://glama.ai/mcp/servers/Shine8592/duduExcel（页面标题 `duduExcel by Shine8592 \| Glama`，已抓取 PivotTable 等能力）|
-| 2 | PyPI | ✅ 已发布 v0.3.0 | https://pypi.org/project/duduexcel/ |
-| 3 | GitHub Release | ✅ v0.2.0 → v0.3.0 | 4 个 release |
-| 4 | 仓库 topics | ✅ 12 个 | 让 GitHub 搜索可见 |
+| 1 | **glama.ai** | ✅ **已收录** | https://glama.ai/mcp/servers/Shine8592/duduExcel |
+| 2 | **mcpservers.org** | ⏳ **审核中（约 12h）** | 已提交，站点提示 12 小时审核 |
+| 3 | PyPI | ✅ 已发布 v0.3.0 | https://pypi.org/project/duduexcel/ |
+| 4 | GitHub Release | ✅ v0.2.0 → v0.3.0 | 4 个 release |
+| 5 | 仓库 topics | ✅ 12 个 | 让 GitHub 搜索可见 |
 
 > ⚠️ **mcp.so 不做**：该站提交需付费。已找到免费替代（见下方 P1）。
 
@@ -50,13 +51,13 @@ duduExcel keeps the strikethrough — because the author's formatting IS the mea
 
 > mcpservers.org 和 PulseMCP 都会**自动从 GitHub 抓取**，填仓库地址即可。
 
-| 优先级 | 站点 | 提交入口 | 费用 | 备注 |
+| 优先级 | 站点 | 提交入口 | 状态 | 备注 |
 |---|---|---|---|---|
-| **1** | **mcpservers.org** | https://mcpservers.org/submit | 免费（Premium 可选）| 12,668 个 server |
-| **2** | **PulseMCP** | https://www.pulsemcp.com/submit | 免费 | 20,000+ server，每日更新，最全 |
-| **3** | **LobeHub MCP** | https://lobehub.com/mcp | 免费 | 中文友好 |
-| **4** | **ModelScope MCP 广场** | https://modelscope.cn/mcp | 免费 | 国内流量，中文 README 占优 |
-| 5 | Smithery | https://smithery.ai/new | 免费 | 需 Smithery CLI，可跳过 |
+| ~~1~~ | ~~mcpservers.org~~ | — | ✅ 已提交 | 等 12h 审核 |
+| **2** | **LobeHub MCP** | https://lobehub.com/mcp → Publish | ⬜ 待提交 | 页面有 Publish 入口，中文友好 |
+| **3** | **Smithery** | https://smithery.ai → Publish | ⬜ 待提交 | 页面有 Publish 入口（已被 Arcade.dev 收购）|
+| **4** | **ModelScope MCP 广场** | https://modelscope.cn/mcp | ⬜ 待提交 | 国内流量，需登录；中文 README 占优 |
+| ⏸️ | **PulseMCP** | https://www.pulsemcp.com/submit | ⏸️ **站点暂停** | 官方公告：「submissions still paused while we rework how we ingest listings」——**等它重开再提交** |
 
 ---
 
