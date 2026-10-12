@@ -11,8 +11,10 @@ requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Shine8592" }]
 keywords = [
-    "excel", "xlsx", "spreadsheet", "mcp", "model-context-protocol",
+    "excel", "xlsx", "xlsm", "spreadsheet", "mcp", "model-context-protocol",
     "ai-agent", "llm", "openpyxl", "pandas", "automation", "chinese",
+    "token-efficient", "server-side-aggregation", "format-semantics",
+    "pivot-table", "chart", "libreoffice", "cjk", "office",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -24,6 +26,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Office/Business :: Financial :: Spreadsheet",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Framework :: Robot Framework :: Library",
 ]
 dependencies = [
     "openpyxl>=3.1.0",
@@ -45,6 +49,9 @@ Homepage = "https://github.com/Shine8592/duduExcel"
 Repository = "https://github.com/Shine8592/duduExcel"
 Issues = "https://github.com/Shine8592/duduExcel/issues"
 Changelog = "https://github.com/Shine8592/duduExcel/blob/main/CHANGELOG.md"
+"Competitive Analysis" = "https://github.com/Shine8592/duduExcel/blob/main/competitive-analysis.md"
+Documentation = "https://github.com/Shine8592/duduExcel/blob/main/README.md"
+"Bug Tracker" = "https://github.com/Shine8592/duduExcel/issues"
 
 [project.scripts]
 duduexcel = "duduexcel.__main__:main"

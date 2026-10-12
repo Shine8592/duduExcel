@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.Shine8592/duduExcel -->
 # 📊 duduExcel
 
 [![CI](https://github.com/Shine8592/duduExcel/actions/workflows/ci.yml/badge.svg)](https://github.com/Shine8592/duduExcel/actions/workflows/ci.yml)

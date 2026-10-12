@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.Shine8592/duduExcel -->
 # 📊 duduExcel
 
 [![CI](https://github.com/Shine8592/duduExcel/actions/workflows/ci.yml/badge.svg)](https://github.com/Shine8592/duduExcel/actions/workflows/ci.yml)
@@ -15,8 +16,15 @@
 > duduExcel 保留删除线 —— 因为**作者留下的格式，本身就是语义**。
 
 ```bash
-pip install "duduexcel[analysis]"    # 或：uvx duduexcel
+# 免安装直接跑（推荐，无需 pip install）
+uvx duduexcel
+
+# 或安装后运行
+pip install "duduexcel[analysis]"
 ```
+
+> 💡 `uvx duduexcel` 与主流 Excel MCP 体验一致：零安装、自动拉最新版。
+> 挂载到 MCP 客户端时用 `uvx duduexcel` 作为 command 即可（见下方「挂载」）。
 
 ```
 Agent ──MCP(stdio)──► duduExcel ──► openpyxl/pandas ──► .xlsx
