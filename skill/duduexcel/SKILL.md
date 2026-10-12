@@ -4,7 +4,7 @@ description: Excel 表格处理（.xlsx/.xlsm）。当用户需要读取、分�
 license: MIT
 compatibility: 需要 Python 3.10+、openpyxl、pandas；公式重算（recalculate）还需本机安装 LibreOffice
 metadata:
-  version: "0.2.0"
+  version: "0.3.1"
   transport: stdio
 ---
 

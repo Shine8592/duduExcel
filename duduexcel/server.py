@@ -37,7 +37,7 @@ from duduexcel.safety import (
     revert_last,
 )
 
-SERVER_VERSION = "0.2.0"
+SERVER_VERSION = "0.3.1"
 
 mcp = MCPServer("duduExcel")
 
@@ -548,6 +548,41 @@ def list_conditional_formats(file_path: str, sheet: str | None = None) -> dict:
     p = resolve_path(file_path)
     require_exists(p)
     return advanced.list_conditional_formats(p, sheet)
+
+
+@mcp.tool()
+def format_scan(
+    file_path: str,
+    sheet: Optional[str] = None,
+    semantic: Optional[str] = None,
+    max_cells: int = 200,
+) -> dict:
+    """【本服务独有】扫描工作表的格式语义，支持按语义筛选与统计。
+
+    为什么需要它：主流 Excel MCP 把「删除线 / 高亮 / 字体色」当作样式，
+    读出来是一模一样的字符串 —— 它们看不出作者标了"这一行作废了"。
+    duduExcel 把格式当作**语义**，本工具进一步让它可统计、可查询。
+
+    典型用途：
+    - 「这张表有多少行被标记作废了？」→ semantic="S"
+    - 「哪些格子是重点高亮的？」→ semantic="HL"
+    - 「先看看这张表用了哪些语义标记」→ 不传 semantic，只看统计
+
+    参数：
+    - file_path：工作簿路径
+    - sheet：表名（省略则用活动表）
+    - semantic：按语义筛选，可选 S(删除线/作废) / B(粗体) / I(斜体)
+                / HL(底色高亮) / C(字体色) / M(合并单元格)
+    - max_cells：最多返回多少个命中单元格（超出会说明截断数量，以统计值为准）
+
+    返回：semantic_counts（各类语义的数量）、hits（命中明细，含坐标与值）、
+          以及每种语义的**业务含义提示**（hint）。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return advanced.format_scan(
+        p, sheet=sheet, semantic=semantic, max_cells=int(max_cells)
+    )
 
 
 @mcp.tool()

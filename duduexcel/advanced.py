@@ -445,3 +445,112 @@ def join_sheets(
     }
     result["_meta"] = _meta(total, len(view.columns), result)
     return result
+
+
+# ---------------------------------------------------------------------------
+# 格式语义扫描（P1 升级：把"作者留下的格式"变成可查询的语义）
+# ---------------------------------------------------------------------------
+
+# 语义标记 -> 业务含义（用于向 Agent 解释"这意味着什么"）
+_SEMANTIC_HINTS = {
+    "S": "删除线 —— 常表示「已取消 / 作废」，读取时应与生效数据区分",
+    "B": "粗体 —— 常表示重点或标题行",
+    "I": "斜体 —— 常表示注释、备注或待确认",
+    "HL": "底色高亮 —— 常表示「待审阅 / 需关注」",
+    "C": "字体色 —— 可能表示状态分类（如红=异常）",
+    "M": "合并单元格 —— 注意只有左上角可写",
+}
+
+
+def _semantic_kind(mark: str) -> str:
+    """把具体标记归到语义大类：HL:yellow -> HL"""
+    return mark.split(":", 1)[0] if ":" in mark else mark
+
+
+def format_scan(
+    file_path: Path,
+    sheet: str | None = None,
+    semantic: str | None = None,
+    max_cells: int = 200,
+) -> dict:
+    """扫描工作表的格式语义标记，支持按语义筛选与统计。
+
+    为什么有这个能力（差异化核心）：
+      主流 Excel MCP 把「删除线 / 高亮」当作样式，读出来是一模一样的字符串；
+      它们看不出作者标了"这一行作废了"。duduExcel 把格式当作**语义**，
+      本函数进一步让它可统计、可筛选 —— 例如"统计所有标记作废的行"。
+
+      这是 haris-musa/excel-mcp-server（约 4.2k★）等同类**完全不具备**的能力。
+
+    参数：
+    - file_path：工作簿路径
+    - sheet：表名（省略则用活动表）
+    - semantic：按语义筛选，可选 S / B / I / HL / C / M；省略则统计全部
+    - max_cells：最多返回多少个命中单元格（超出会说明截断数量）
+
+    返回：语义统计（各类标记的数量）、命中单元格明细、以及业务含义提示。
+    """
+    wb = load_workbook(str(file_path), data_only=False)
+    try:
+        ws = wb[sheet] if sheet else wb.active
+
+        from duduexcel.excel_ops import _format_markers, _is_hidden_row
+
+        counts: dict[str, int] = {}
+        hits: list[dict] = []
+        total_scanned = 0
+        truncated = False
+
+        for row in ws.iter_rows():
+            if _is_hidden_row(ws, row[0].row):
+                continue
+            for cell in row:
+                total_scanned += 1
+                marks = _format_markers(cell)
+                if not marks:
+                    continue
+                for m in marks:
+                    kind = _semantic_kind(m)
+                    counts[kind] = counts.get(kind, 0) + 1
+                if semantic:
+                    wanted = semantic.upper()
+                    if wanted not in [_semantic_kind(x).upper() for x in marks]:
+                        continue
+                if len(hits) >= max_cells:
+                    truncated = True
+                    continue
+                raw = cell.value
+                if isinstance(raw, str) and len(raw) > 60:
+                    raw = raw[:60] + "..."
+                hits.append({
+                    "cell": cell.coordinate,
+                    "value": raw,
+                    "marks": marks,
+                })
+
+        merged_count = len(ws.merged_cells.ranges)
+        if merged_count:
+            counts["M"] = counts.get("M", 0) + merged_count
+
+        hint = _SEMANTIC_HINTS.get((semantic or "").upper())
+        return {
+            "ok": True,
+            "sheet": ws.title,
+            "cells_scanned": total_scanned,
+            "semantic_counts": dict(sorted(counts.items(), key=lambda x: -x[1])),
+            "filter": semantic.upper() if semantic else None,
+            "hits": hits,
+            "hits_count": len(hits),
+            "truncated": truncated,
+            "max_cells": max_cells,
+            "merged_ranges": merged_count,
+            "hint": hint,
+            "semantics_guide": _SEMANTIC_HINTS,
+            "note": (
+                "命中超过 max_cells=%d，仅返回前 %d 条；完整数量见 semantic_counts。"
+                % (max_cells, len(hits))
+                if truncated else None
+            ),
+        }
+    finally:
+        wb.close()
