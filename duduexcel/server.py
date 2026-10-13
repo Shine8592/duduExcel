@@ -551,6 +551,91 @@ def list_conditional_formats(file_path: str, sheet: str | None = None) -> dict:
 
 
 @mcp.tool()
+def add_data_validation(
+    file_path: str,
+    cell_range: str,
+    dv_type: str = "list",
+    formula1: str = "",
+    formula2: Optional[str] = None,
+    sheet: Optional[str] = None,
+    allow_blank: bool = True,
+) -> dict:
+    """给区域加数据验证（下拉列表 / 数值区间 / 日期区间）。
+
+    用途：表单类表格中限定某列只能选指定值（如"状态"列只能选 生效 / 作废 / 待审阅），
+    或限定数值范围（如金额必须 >= 0）。
+
+    参数：
+    - file_path：工作簿路径
+    - cell_range：目标区域，如 "D2:D100"
+    - dv_type：list / whole / decimal / date / time / textLength / custom
+    - formula1：
+        * list：'"选项1,选项2,选项3)' —— 注意外层单引号内必须带双引号
+        * whole / decimal：如 ">=0" 或 "1"（区间则配合 formula2）
+    - formula2：区间上界，如 "<=100"
+    - allow_blank：是否允许空值
+
+    返回：写入的规则信息（真实 OOXML 数据验证，Excel 中生效）。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return advanced.add_data_validation(
+        p, sheet=sheet, cell_range=cell_range, dv_type=dv_type,
+        formula1=formula1, formula2=formula2, allow_blank=allow_blank,
+    )
+
+
+@mcp.tool()
+def remove_duplicates(
+    file_path: str,
+    columns: Optional[list[str]] = None,
+    sheet: Optional[str] = None,
+) -> dict:
+    """按指定列删除重复行（保留首次出现的行）—— 只回统计，不回数据行。
+
+    用途：数据清洗。例如按"订单号"去重，只保留第一次出现的记录。
+
+    参数：
+    - file_path：工作簿路径
+    - columns：按哪些列判重（列名或列字母如 "A"）；省略则按整行判重
+    - sheet：表名（省略则用活动表）
+
+    返回：删除行数、剩余行数（物理删除，保留首次出现）。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return advanced.remove_duplicates(p, sheet=sheet, columns=columns)
+
+
+@mcp.tool()
+def find_replace(
+    file_path: str,
+    find: str,
+    replace: str = "",
+    sheet: Optional[str] = None,
+    cell_range: Optional[str] = None,
+    match_case: bool = False,
+) -> dict:
+    """在工作表中查找并替换文本（批量修正数据）。
+
+    参数：
+    - file_path：工作簿路径
+    - find：要查找的文本
+    - replace：替换为（传空串表示删除匹配到的文本）
+    - cell_range：限定区域如 "A1:D100"；省略则整表
+    - match_case：是否区分大小写（默认否）
+
+    返回：替换的单元格数量与明细（受数量上限保护）。
+    """
+    p = resolve_path(file_path)
+    require_exists(p)
+    return advanced.find_replace(
+        p, find=find, replace=replace, sheet=sheet,
+        cell_range=cell_range, match_case=match_case,
+    )
+
+
+@mcp.tool()
 def format_scan(
     file_path: str,
     sheet: Optional[str] = None,

@@ -20,6 +20,7 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.formatting.rule import CellIsRule, ColorScaleRule, DataBarRule
+from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -554,3 +555,257 @@ def format_scan(
         }
     finally:
         wb.close()
+
+
+# ---------------------------------------------------------------------------
+# P2 广度补齐（对标 haris-musa/excel-mcp-server 的高价值能力）
+# ---------------------------------------------------------------------------
+
+# 数据验证类型
+DV_TYPES = {"list", "whole", "decimal", "date", "time", "textLength", "custom"}
+
+
+def add_data_validation(
+    file_path: Path,
+    sheet: str | None = None,
+    cell_range: str = "",
+    dv_type: str = "list",
+    formula1: str = "",
+    formula2: str | None = None,
+    allow_blank: bool = True,
+) -> dict:
+    """给区域加数据验证（下拉 / 数值区间 / 日期区间等）。
+
+    为什么有这个能力：头名 haris-musa 有 add_data_validation，duduExcel 此前没有。
+    表单类表格（如"状态列只能选 生效/作废/待审阅）是刚需场景。
+
+    参数：
+    - cell_range：目标区域，如 "D2:D100
+    - dv_type：list / whole / decimal / date / time / textLength / custom
+    - formula1：
+        * list 类型：'"选项1,选项2,选项3)'（注意外层单引号内的双引号）
+        * whole/decimal：如 "0"、">=0"、">=1"、1,100 区间用 formula1 + formula2
+    - formula2：区间上界（whole/decimal 的 "<=100)
+
+    返回：写入的规则信息与目标区域。
+    """
+    dv_type = (dv_type or "list").strip()
+    if dv_type not in DV_TYPES:
+        return {
+            "ok": False,
+            "error": "不支持的数据验证类型：%s。可用：%s" % (dv_type, " / ".join(sorted(DV_TYPES))),
+        }
+    if not cell_range:
+        return {"ok": False, "error": "cell_range 不能为空，如 D2:D100"}
+
+    wb = load_workbook(str(file_path))
+    try:
+        ws = wb[sheet] if sheet else wb.active
+        dv = DataValidation(
+            type=dv_type,
+            formula1=formula1 or None,
+            formula2=formula2,
+            allow_blank=bool(allow_blank),
+            showErrorMessage=True,
+        )
+        ws.add_data_validation(dv)
+        dv.add(cell_range)
+        wb.save(str(file_path))
+        return {
+            "ok": True,
+            "sheet": ws.title,
+            "cell_range": cell_range,
+            "type": dv_type,
+            "formula1": formula1,
+            "formula2": formula2,
+            "allow_blank": bool(allow_blank),
+            "note": "已写入真实 OOXML 数据验证（Excel 中生效，非视觉近似）",
+        }
+    finally:
+        wb.close()
+
+
+def remove_duplicates(
+    file_path: Path,
+    sheet: str | None = None,
+    columns: list[str] | None = None,
+    has_header: bool = True,
+) -> dict:
+    """按指定列删除重复行（保留首次出现的行）。
+
+    为什么有这个能力：头名有 remove_duplicates，duduExcel 此前没有。
+    数据清洗刚需。
+
+    参数：
+    - columns：按哪些列判重（列名或列字母）；省略则按整行判重
+    - has_header：首行是否为表头（是则表头不参与判重）
+
+    返回：删除的行数、剩余行数（只回统计，不回数据行 —— 服务端算完只回结果）。
+    """
+    wb = load_workbook(str(file_path))
+    try:
+        ws = wb[sheet] if sheet else wb.active
+        if ws.max_row < 2:
+            return {"ok": True, "removed": 0, "remaining": ws.max_row, "note": "行数不足，无需去重"}
+
+        # 确定判重列索引（0 起）
+        header = [c.value for c in ws[1]]
+        if columns:
+            idxs = []
+            for col in columns:
+                if isinstance(col, str) and col.isalpha():
+                    idxs.append(_col_letter_to_idx(col))
+                elif col in header:
+                    idxs.append(header.index(col))
+                else:
+                    return {"ok": False, "error": "列不存在：%s。可用列：%s" % (col, header)}
+
+        else:
+            idxs = list(range(ws.max_column))
+
+        # ⚠️ 不用 ws.delete_rows() —— openpyxl 存在已知 bug：当工作表含数据验证
+        # （DataValidation）时，delete_rows 会破坏 sheet dimension 计算，
+        # 保存时抛 ValueError: Invalid column index（实测复现：Invalid column index 24695457）。
+        # 改用「重建数据法」：读全部行 -> 过滤重复 -> 清空单元格 -> 写回保留行。
+        # 代价：单元格格式（字体/填充）不保留，返回中如实说明。
+        all_rows = [
+            [ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)]
+            for r in range(1, ws.max_row + 1)
+        ]
+        header_row = all_rows[0] if has_header else None
+
+        # 确定判重列索引（0 起，列号从 1 起）
+        if columns:
+            idxs = []
+            for col in columns:
+                # 列字母只认 ASCII 字母（中文 isalpha() 也为 True，会算出非法索引 → IndexError，实测踩到）
+                if isinstance(col, str) and col.isascii() and col.isalpha():
+                    idxs.append(_col_letter_to_idx(col))
+                elif isinstance(col, int):
+                    idxs.append(col)
+                elif header_row and col in header_row:
+                    idxs.append(header_row.index(col))
+                else:
+                    return {"ok": False,
+                            "error": "列不存在：%s。可用列：%s" % (col, header_row)}
+
+        else:
+            idxs = list(range(ws.max_column))
+
+        data_rows = all_rows[1:] if has_header else all_rows
+        seen = set()
+        kept_rows: list[list] = []
+        dup_original_rows: list[int] = []
+        for offset, row in enumerate(data_rows):
+            key = tuple(row[c] for c in idxs)
+            if key in seen:
+                dup_original_rows.append(offset + (2 if has_header else 1))
+                continue
+            seen.add(key)
+            kept_rows.append(row)
+
+        # 清空所有单元格（保留数据验证等 ws 级规则，只清值）
+        for r in range(1, ws.max_row + 1):
+            for c in range(1, ws.max_column + 1):
+                ws.cell(row=r, column=c).value = None
+
+        # 写回：表头 + 保留行
+        write_rows = ([header_row] if has_header else []) + kept_rows
+        for i, row in enumerate(write_rows, start=1):
+            for j, v in enumerate(row, start=1):
+                ws.cell(row=i, column=j).value = v
+
+        wb.save(str(file_path))
+        return {
+            "ok": True,
+            "sheet": ws.title,
+            "removed": len(dup_original_rows),
+            "removed_rows": dup_original_rows[:20],
+            "remaining": len(kept_rows),
+            "by_columns": columns or "整行",
+            "note": "已删除重复行（保留首次出现）。⚠️ 因规避 openpyxl delete_rows 的已知 bug，"
+                    "采用重建数据法，**单元格格式（字体/填充）不保留**（公式以 = 开头会作为公式写回）。",
+        }
+    finally:
+        wb.close()
+
+
+def find_replace(
+    file_path: Path,
+    find: str,
+    replace: str = "",
+    sheet: str | None = None,
+    cell_range: str | None = None,
+    match_case: bool = False,
+    max_hits: int = 500,
+) -> dict:
+    """在工作表中查找并替换文本。
+
+    为什么有这个能力：头名有 replace_cells，duduExcel 此前没有。
+    批量修正数据刚需。
+
+    参数：
+    - find：要查找的文本
+    - replace：替换为（空串表示删除）
+    - cell_range：限定区域，如 A1:D100；省略则整表
+    - match_case：是否区分大小写
+
+    返回：替换的单元格数量与明细（受 max_hits 限制，超出说明截断）。
+    """
+    if not find:
+        return {"ok": False, "error": "find 不能为空"}
+
+    wb = load_workbook(str(file_path))
+    try:
+        ws = wb[sheet] if sheet else wb.active
+        target = ws[cell_range] if cell_range else ws.iter_rows()
+
+        hits = []
+        replaced = 0
+        for row in target:
+            for cell in row:
+                v = cell.value
+                if not isinstance(v, str):
+                    continue
+                hay = v if match_case else v.lower()
+                needle = find if match_case else find.lower()
+                if needle in hay:
+                    if match_case:
+                        new_v = v.replace(find, replace)
+                    else:
+                        # 大小写不敏感替换：用正则保留原大小写
+                        import re as _re
+                        new_v = _re.sub(_re.escape(find), replace, v, flags=_re.IGNORECASE)
+                    cell.value = new_v
+                    replaced += 1
+                    if len(hits) < max_hits:
+                        hits.append({"cell": cell.coordinate, "old": v if len(v) < 40 else v[:40] + "...",
+                                     "new": new_v if len(str(new_v)) < 40 else str(new_v)[:40] + "...",
+                                     })
+
+        if replaced:
+            wb.save(str(file_path))
+        return {
+            "ok": True,
+            "sheet": ws.title,
+            "find": find,
+            "replace": replace,
+            "replaced_count": replaced,
+            "hits": hits,
+            "truncated": replaced > max_hits,
+            "max_hits": max_hits,
+            "note": ("命中超过 max_hits=%d，明细仅返回前 %d 条，实际替换数见 replaced_count"
+                     % (max_hits, len(hits)) if replaced > max_hits else None),
+        }
+    finally:
+        wb.close()
+
+
+def _col_letter_to_idx(letter: str) -> int:
+    """列字母转 0 起索引：A->0, B->1, AA->26
+    """
+    letter = letter.strip().upper()
+    idx = 0
+    for ch in letter:
+        idx = idx * 26 + (ord(ch) - 64)
+    return idx - 1

@@ -47,6 +47,8 @@ jobs:
           python tests/test_m10_pivot.py
           # P1 新增：格式语义可查询（差异化能力，必须守住）
           python tests/test_format_scan.py
+          # P2 新增：数据验证 / 去重 / 查找替换（对标头名补齐）
+          python tests/test_bulk_ops.py
 
       - name: Verify CLI entry point
         run: python -c "import duduexcel, duduexcel.server; print('import OK')"
